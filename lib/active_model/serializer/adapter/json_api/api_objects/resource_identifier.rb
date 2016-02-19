@@ -4,9 +4,9 @@ module ActiveModel
       class JsonApi
         module ApiObjects
           class ResourceIdentifier
-            def initialize(serializer)
-              @id = id_for(serializer)
-              @type = type_for(serializer)
+            def initialize(serializer, association = nil)
+              @id = id_for(serializer, association)
+              @type = type_for(serializer, association)
             end
 
             def as_json
@@ -19,17 +19,45 @@ module ActiveModel
 
             private
 
-            def type_for(serializer)
-              return serializer._type if serializer._type
-              if ActiveModelSerializers.config.jsonapi_resource_type == :singular
-                serializer.object.class.model_name.singular
+            def formatted_type(type)
+              type = if ActiveModel::Serializer.config.jsonapi_resource_type == :singular
+                       type.singularize
+                     else
+                       type.pluralize
+                     end
+              type.underscore
+            end
+
+            def type_for(serializer, association = nil)
+              if association
+                if association.serializer.respond_to?(:type)
+                  formatted_type(association.serializer.type)
+                elsif serializer.object.class.respond_to?(:reflections)
+                  reflection = serializer.object.class.reflections[association.key.to_s]
+                  formatted_type(reflection.class_name)
+                else
+                  type_for(association.serializer)
+                end
               else
-                serializer.object.class.model_name.plural
+                return serializer._type if serializer._type
+                if ActiveModelSerializers.config.jsonapi_resource_type == :singular
+                  serializer.object.class.model_name.singular
+                else
+                  serializer.object.class.model_name.plural
+                end
               end
             end
 
-            def id_for(serializer)
-              serializer.read_attribute_for_serialization(:id).to_s
+            def id_for(serializer, association = nil)
+              if association
+                if serializer.respond_to?("#{association.key}_id")
+                  serializer.send("#{association.key}_id")
+                else
+                  id_for(association.serializer)
+                end
+              else
+                serializer.read_attribute_for_serialization(:id).to_s
+              end
             end
           end
         end

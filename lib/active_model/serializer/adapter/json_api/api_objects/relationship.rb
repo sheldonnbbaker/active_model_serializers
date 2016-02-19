@@ -4,12 +4,13 @@ module ActiveModel
       class JsonApi
         module ApiObjects
           class Relationship
-            def initialize(parent_serializer, serializer, options = {}, links = {}, meta = nil)
+            # ADD
+            def initialize(parent_serializer, serializer, options = {}, links = {}, meta = nil, association = nil)
               @object = parent_serializer.object
               @scope = parent_serializer.scope
 
               @options = options
-              @data = data_for(serializer, options)
+              @data = data_for(serializer, association, options)
               @links = links.each_with_object({}) do |(key, value), hash|
                 hash[key] = Link.new(parent_serializer, value).as_json
               end
@@ -33,12 +34,14 @@ module ActiveModel
 
             private
 
-            def data_for(serializer, options)
+            def data_for(serializer, association, options)
               if serializer.respond_to?(:each)
                 serializer.map { |s| ResourceIdentifier.new(s).as_json }
               else
                 if options[:virtual_value]
                   options[:virtual_value]
+                elsif association && serializer.class.respond_to?(:_reflections) && serializer.class._reflections.find { |r| r.name == association.key }.is_a?(BelongsToReflection)
+                  resource_identifier_for(serializer)
                 elsif serializer && serializer.object
                   ResourceIdentifier.new(serializer).as_json
                 end

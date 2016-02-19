@@ -164,7 +164,8 @@ module ActiveModel
               association.serializer,
               association.options,
               association.links,
-              association.meta
+              association.meta,
+              association
             ).as_json
           end
         end
